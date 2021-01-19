@@ -12,6 +12,7 @@ storage
 
 # electron-packager folders
 Acorn-*
+iamp2p-*
 
 # copied binaries
 lair-keystore

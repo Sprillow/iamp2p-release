@@ -1,21 +1,15 @@
 {
-  "name": "Acorn",
-  "version": "0.4.1",
-  "description": "A Holochain State of Affairs Tree application",
+  "name": "iamp2p",
+  "version": "1.0.0",
+  "description": "Your Guide To P2P",
   "main": "main.js",
   "scripts": {
     "start": "electron ."
   },
-  "repository": "https://github.com/h-be/acorn-release",
-  "keywords": [
-    "Electron",
-    "Acorn",
-    "State of Affairs"
-  ],
-  "author": "Harris-Braun Enterprises, LLC and contributors",
+  "repository": "https://github.com/sprillow/iamp2p-release",
+  "author": "Sprillow Limited",
   "license": "CAL-1.0 Beta 4",
   "dependencies": {
-    "@holochain/conductor-api": "0.0.1-dev.14",
     "command-exists": "^1.2.8",
     "electron-context-menu": "^0.12.1",
     "electron-debug": "^3.0.1",

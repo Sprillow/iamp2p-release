@@ -14,8 +14,6 @@ require('electron-context-menu')()
 require('fix-path')()
 require('electron-debug')({ isEnabled: true, showDevTools: false })
 
-const { AdminWebsocket } = require('@holochain/conductor-api')
-
 // ELECTRON
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -26,8 +24,6 @@ let quit = false
 // veresions of these same ports
 const APP_PORT = 8889 // MUST MATCH ACORN_UI config
 const ADMIN_PORT = 1235 // MUST MATCH ACORN_UI config
-const PROFILES_APP_ID = 'profiles-app' // MUST MATCH ACORN_UI config
-const MATCH_ACORN_UI_PROFILES_DNA_NICK = 'profiles.dna.gz'
 
 // a special log from the conductor, specifying
 // that the interfaces are ready to receive incoming
@@ -38,14 +34,15 @@ const HOLOCHAIN_BIN = './holochain'
 const LAIR_KEYSTORE_BIN = './lair-keystore'
 
 // TODO: make this based on version number?
-const CONFIG_PATH = path.join(app.getPath('appData'), 'HcAcorn')
-const STORAGE_PATH = path.join(CONFIG_PATH, 'database')
-const CONDUCTOR_CONFIG_PATH = path.join(CONFIG_PATH, 'conductor-config.yml')
+const CONFIG_PATH = path.join(app.getPath('appData'), 'iamp2p')
+const INNER_CONFIG = path.join(CONFIG_PATH, 'holochain')
+const STORAGE_PATH = path.join(INNER_CONFIG, 'database')
+const CONDUCTOR_CONFIG_PATH = path.join(INNER_CONFIG, 'conductor-config.yml')
 
-if (!fs.existsSync(CONFIG_PATH)) {
-  fs.mkdirSync(CONFIG_PATH)
-  fs.mkdirSync(STORAGE_PATH)
-  fs.writeFileSync(
+if (!fs.existsSync(CONFIG_PATH)) fs.mkdirSync(CONFIG_PATH)
+if (!fs.existsSync(INNER_CONFIG)) fs.mkdirSync(INNER_CONFIG)
+if (!fs.existsSync(STORAGE_PATH)) fs.mkdirSync(STORAGE_PATH)
+if (!fs.existsSync(CONDUCTOR_CONFIG_PATH)) fs.writeFileSync(
     CONDUCTOR_CONFIG_PATH,
     `
 environment_path: ${STORAGE_PATH}
@@ -67,7 +64,6 @@ network:
         type: remote_proxy_client
         proxy_url: kitsune-proxy://VYgwCrh2ZCKL1lpnMM1VVUee7ks-9BkmW47C_ys4nqg/kitsune-quic/h/kitsune-proxy.harris-braun.com/p/4010/--`
   )
-}
 
 function createWindow() {
   // Create the browser window.
@@ -157,26 +153,6 @@ async function startConductor() {
   })
 }
 
-async function installIfFirstLaunch(adminWs) {
-  const dnas = await adminWs.listDnas()
-  // const activeAppIds = await adminWs.listActiveApps()
-  if (dnas.length === 0) {
-    let myPubKey = await adminWs.generateAgentPubKey()
-    await adminWs.installApp({
-      agent_key: myPubKey,
-      installed_app_id: PROFILES_APP_ID,
-      dnas: [
-        {
-          nick: MATCH_ACORN_UI_PROFILES_DNA_NICK,
-          path: './dna/profiles.dna.gz',
-        },
-      ],
-    })
-    await adminWs.activateApp({ installed_app_id: PROFILES_APP_ID })
-    await adminWs.attachAppInterface({ port: APP_PORT })
-  }
-}
-
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -187,8 +163,6 @@ app.on('ready', async function () {
     .catch((err) => console.log('An error occurred: ', err))
   createWindow()
   await startConductor()
-  const adminWs = await AdminWebsocket.connect(`ws://localhost:${ADMIN_PORT}`)
-  await installIfFirstLaunch(adminWs)
   // trigger refresh once we know
   // interfaces have booted up
   mainWindow.loadURL('file://' + __dirname + '/ui/index.html')
