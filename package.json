@@ -4,7 +4,8 @@
   "description": "Your Guide To P2P",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "package-windows": "electron-packager . iamp2p --platform=win32 --out=build --overwrite --icon=images/iamp2p-app-icon-1024px-green.ico"
   },
   "repository": "https://github.com/sprillow/iamp2p-release",
   "author": "Sprillow Limited",

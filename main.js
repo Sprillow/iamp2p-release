@@ -13,6 +13,7 @@ const { log, logger } = require('./logger')
 require('electron-context-menu')()
 require('fix-path')()
 require('electron-debug')({ isEnabled: true, showDevTools: false })
+const { wslPath, killAllWsl } = require('./cli');
 
 // ELECTRON
 // Keep a global reference of the window object, if you don't, the window will
@@ -30,8 +31,22 @@ const ADMIN_PORT = 1235 // MUST MATCH ACORN_UI config
 // connections
 const MAGIC_READY_STRING = 'Conductor ready.'
 
-const HOLOCHAIN_BIN = './holochain'
-const LAIR_KEYSTORE_BIN = './lair-keystore'
+let HOLOCHAIN_BIN = './holochain'
+if (process.platform === "win32") {
+  HOLOCHAIN_BIN = 'holochain-linux';
+}
+let LAIR_KEYSTORE_BIN = './lair-keystore'
+if (process.platform === "win32") {
+  LAIR_KEYSTORE_BIN = 'lair-keystore-linux';
+}
+
+/** Add Holochain bins to PATH for WSL */
+const BIN_DIR = "bin";
+const BIN_PATH = path.join(__dirname, BIN_DIR);
+if (process.platform === "win32") {
+  log('info', 'BIN_PATH = ' + BIN_PATH);
+  process.env.PATH += ';' + BIN_PATH;
+}
 
 // TODO: make this based on version number?
 const CONFIG_PATH = path.join(app.getPath('appData'), 'iamp2p')
@@ -43,9 +58,9 @@ if (!fs.existsSync(CONFIG_PATH)) fs.mkdirSync(CONFIG_PATH)
 if (!fs.existsSync(INNER_CONFIG)) fs.mkdirSync(INNER_CONFIG)
 if (!fs.existsSync(STORAGE_PATH)) fs.mkdirSync(STORAGE_PATH)
 if (!fs.existsSync(CONDUCTOR_CONFIG_PATH)) fs.writeFileSync(
-    CONDUCTOR_CONFIG_PATH,
-    `
-environment_path: ${STORAGE_PATH}
+  CONDUCTOR_CONFIG_PATH,
+  `
+environment_path: ${wslPath(STORAGE_PATH)}
 use_dangerous_test_keystore: false
 passphrase_service:
   type: cmd
@@ -63,13 +78,14 @@ network:
       proxy_config:
         type: remote_proxy_client
         proxy_url: kitsune-proxy://VYgwCrh2ZCKL1lpnMM1VVUee7ks-9BkmW47C_ys4nqg/kitsune-quic/h/kitsune-proxy.harris-braun.com/p/4010/--`
-  )
+)
 
 function createWindow() {
   // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 1000,
+    icon: __dirname + `/images/iamp2p.png`,
     webPreferences: {
       nodeIntegration: true,
     },
@@ -100,8 +116,19 @@ let holochain_handle
 let lair_keystore_handle
 
 async function startConductor() {
-  lair_keystore_handle = spawn(LAIR_KEYSTORE_BIN, [], {
+
+  // adapt to WSL if needed
+  let lair_bin = LAIR_KEYSTORE_BIN;
+  let lair_args = [];
+  if (process.platform === "win32") {
+    lair_bin = process.env.comspec;
+    lair_args.unshift("/c", "wsl", LAIR_KEYSTORE_BIN);
+  }
+  lair_keystore_handle = spawn(lair_bin, lair_args, {
     cwd: __dirname,
+    env: {
+      ...process.env,
+    }
   })
   lair_keystore_handle.stdout.on('data', (data) => {
     log('info', 'lair-keystore: ' + data.toString())
@@ -123,9 +150,17 @@ async function startConductor() {
 
   await sleep(100)
 
-  holochain_handle = spawn(HOLOCHAIN_BIN, ['-c', CONDUCTOR_CONFIG_PATH], {
+  // adapt to WSL if needed
+  let holochain_bin = HOLOCHAIN_BIN;
+  let holochain_args = ['-c', wslPath(CONDUCTOR_CONFIG_PATH)];
+  if (process.platform === "win32") {
+    holochain_bin = process.env.comspec;
+    holochain_args.unshift("/c", "wsl", HOLOCHAIN_BIN);
+  }
+  holochain_handle = spawn(holochain_bin, holochain_args, {
     cwd: __dirname,
     env: {
+      ...process.env,
       RUST_BACKTRACE: 1,
     },
   })
@@ -188,6 +223,10 @@ app.on('will-quit', (event) => {
       log('error', err)
     }
   })
+
+  // Make sure there is no outstanding holochain procs
+  killAllWsl(LAIR_KEYSTORE_BIN);
+  killAllWsl(HOLOCHAIN_BIN);
 })
 
 // Quit when all windows are closed.
